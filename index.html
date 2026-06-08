@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>轻小说 AI 批量生成器 - 马甲包内容工厂</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #0f0f1a; --surface: #1a1a2e; --surface2: #222240;
+  --border: #2a2a4a; --text: #e0e0f0; --text2: #9090b0;
+  --accent: #6c5ce7; --accent2: #a29bfe; --pink: #fd79a8;
+  --gold: #f9ca24; --green: #00b894; --red: #e17055;
+}
+body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* 顶部导航 */
+.topbar { background: linear-gradient(135deg, var(--accent), #4834d4); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top:0; z-index:100; box-shadow: 0 2px 20px rgba(108,92,231,.3); }
+.topbar h1 { font-size: 18px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+.topbar h1 span { font-size: 11px; background: rgba(255,255,255,.2); padding: 2px 8px; border-radius: 10px; }
+.topbar-stats { display: flex; gap: 16px; }
+.stat-badge { font-size: 12px; color: rgba(255,255,255,.8); background: rgba(255,255,255,.1); padding: 4px 12px; border-radius: 12px; }
+
+/* 主布局 */
+.app { display: flex; height: calc(100vh - 48px); }
+.sidebar { width: 320px; min-width: 320px; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.main { flex:1; overflow-y: auto; padding: 24px; }
+
+/* 卡片 */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--accent2); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+/* 表单元素 */
+.form-group { margin-bottom: 12px; }
+.form-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; display: block; }
+.form-select, .form-input, .form-textarea {
+  width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 13px; outline: none; transition: .2s;
+}
+.form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,92,231,.2); }
+.form-textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+
+/* 标签选择 */
+.tag-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); color: var(--text2); cursor: pointer; transition: .2s; user-select: none; }
+.tag:hover { border-color: var(--accent); color: var(--accent2); }
+.tag.active { background: linear-gradient(135deg, var(--accent), #4834d4); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(108,92,231,.3); }
+.tag.active:hover { box-shadow: 0 2px 16px rgba(108,92,231,.5); }
+
+/* 按钮 */
+.btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: .2s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), #4834d4); color: #fff; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(108,92,231,.4); }
+.btn-success { background: linear-gradient(135deg, var(--green), #00a381); color: #fff; }
+.btn-gold { background: linear-gradient(135deg, var(--gold), #e1a800); color: #1a1a2e; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent2); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-block { width: 100%; justify-content: center; }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+/* 书籍信息区 */
+.book-preview { display: flex; gap: 16px; margin-bottom: 20px; }
+.cover-preview { width: 160px; min-width: 160px; height: 220px; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+.cover-preview canvas { width: 100%; height: 100%; }
+.book-info { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.book-title-display { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, var(--accent2), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.book-meta { font-size: 12px; color: var(--text2); display: flex; flex-wrap: wrap; gap: 8px; }
+.book-meta span { background: var(--surface2); padding: 3px 10px; border-radius: 10px; }
+.book-desc { font-size: 13px; color: var(--text2); line-height: 1.8; flex: 1; }
+
+/* 章节列表 */
+.chapter-list { display: flex; flex-direction: column; gap: 4px; }
+.chapter-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); cursor: pointer; transition: .2s; }
+.chapter-item:hover { border-color: var(--accent); background: var(--surface2); }
+.chapter-item.active { border-color: var(--accent); background: rgba(108,92,231,.1); }
+.chapter-num { width: 36px; height: 36px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--accent2); flex-shrink: 0; }
+.chapter-num.done { background: linear-gradient(135deg, var(--green), #00a381); color: #fff; }
+.chapter-num.generating { background: var(--gold); color: #1a1a2e; animation: pulse 1s infinite; }
+.chapter-title { flex:1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chapter-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.chapter-status.done { background: rgba(0,184,148,.15); color: var(--green); }
+.chapter-status.pending { background: var(--bg); color: var(--text2); }
+.chapter-status.generating { background: rgba(249,202,36,.15); color: var(--gold); }
+.chapter-wordcount { font-size: 11px; color: var(--text2); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* 章节内容展示 */
+.chapter-content-area { margin-top: 20px; }
+.chapter-toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.chapter-body { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 32px; min-height: 300px; line-height: 2; font-size: 15px; color: var(--text); white-space: pre-wrap; position: relative; }
+.chapter-body.empty { display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 14px; }
+
+/* 进度条 */
+.progress-bar { width: 100%; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; margin: 8px 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--pink)); border-radius: 2px; transition: width .3s; }
+
+/* 操作栏 */
+.actions-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* Toast */
+.toast { position: fixed; top: 60px; right: 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 20px; font-size: 13px; z-index: 200; animation: slideIn .3s; box-shadow: 0 4px 24px rgba(0,0,0,.3); }
+@keyframes slideIn { from { transform: translateX(100px); opacity:0; } }
+
+/* 空状态 */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--text2); text-align: center; }
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: .3; }
+.empty-state p { font-size: 14px; margin-bottom: 8px; }
+.empty-state small { font-size: 12px; opacity: .6; }
+
+/* Tab 切换 */
+.tabs { display: flex; gap: 2px; background: var(--bg); border-radius: 10px; padding: 3px; margin-bottom: 16px; }
+.tab { flex:1; text-align: center; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text2); transition: .2s; }
+.tab.active { background: var(--accent); color: #fff; }
+.tab:hover:not(.active) { color: var(--text); }
+
+/* 数量滑块 */
+.range-row { display: flex; align-items: center; gap: 10px; }
+.range-row input[type=range] { flex:1; accent-color: var(--accent); }
+.range-val { font-size: 14px; font-weight: 700; color: var(--accent2); min-width: 30px; text-align: center; }
+
+/* 封面风格选项 */
+.cover-styles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cover-style-option { aspect-ratio: 2/3; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; overflow: hidden; position: relative; transition: .2s; }
+.cover-style-option:hover { border-color: var(--accent); }
+.cover-style-option.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,92,231,.3); }
+.cover-style-option canvas { width: 100%; height: 100%; }
+.cover-style-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 3px; background: rgba(0,0,0,.7); font-size: 10px; text-align: center; color: #fff; }
+
+/* 底部信息 */
+.sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+.word-count-summary { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); }
+.word-count-summary strong { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📖 轻小说 AI 工厂 <span>马甲包内容生成器 v1.0</span></h1>
+  <div class="topbar-stats">
+    <div class="stat-badge" id="totalChapters">📖 0 章</div>
+    <div class="stat-badge" id="totalWords">📝 0 字</div>
+    <div class="stat-badge" id="totalTime">⏱️ 省约 0 小时</div>
+    <div class="stat-badge" id="aiStatus" style="display:none;background:rgba(0,184,148,.2)">🤖 AI模式</div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- 左侧设置面板 -->
+  <div class="sidebar">
+    <!-- AI 设置卡片 -->
+    <div class="card" id="aiSettingsCard">
+      <div class="card-title">🤖 AI 接入设置</div>
+      <div class="form-group">
+        <div class="form-label">公司网关 API Key</div>
+        <input type="password" class="form-input" id="apiKey" placeholder="请输入公司网关 API Key" autocomplete="off">
+        <div style="font-size:10px;color:var(--text2);margin-top:4px">
+          请求网关：https://ai-code-cn.adprod.cn
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">模型</div>
+        <input class="form-input" id="modelSelect" placeholder="请输入公司网关支持的模型名" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="form-label" style="margin:0">AI 模式</div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+            <input type="checkbox" id="aiModeToggle" style="opacity:0;width:0;height:0" onchange="toggleAIMode()">
+            <span style="position:absolute;inset:0;background:var(--border);border-radius:12px;transition:.3s"></span>
+            <span id="aiToggleDot" style="position:absolute;left:3px;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.3s"></span>
+          </label>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:4px" id="aiModeHint">当前：模板模式（离线可用）</div>
+      </div>
+      <div class="form-group" style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-success" onclick="testAPIConnection()" style="flex:1">🔌 测试连接</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎯 基础设定</div>
+      
+      <div class="form-group">
+        <div class="form-label">频道方向</div>
+        <div class="tag-group" id="genderTags">
+          <div class="tag active" data-value="male">👨 男频</div>
+          <div class="tag" data-value="female">👩 女频</div>
+          <div class="tag" data-value="both">👥 通用</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">小说类型</div>
+        <div class="tag-group" id="genreTags">
+          <div class="tag active" data-value="xuanhuan">⚔️ 玄幻</div>
+          <div class="tag" data-value="dushi">🏙️ 都市</div>
+          <div class="tag" data-value="yanqing">💕 言情</div>
+          <div class="tag" data-value="kehuan">🚀 科幻</div>
+          <div class="tag" data-value="youxi">🎮 游戏</div>
+          <div class="tag" data-value="xuanyi">🔍 悬疑</div>
+          <div class="tag" data-value="lishi">📜 历史</div>
+          <div class="tag" data-value="xianxia">⛩️ 仙侠</div>
+          <div class="tag" data-value="wuxia">🗡️ 武侠</div>
+          <div class="tag" data-value="junshi">🎖️ 军事</div>
+          <div class="tag" data-value="lingyi">👻 灵异</div>
+          <div class="tag" data-value="tiyu">⚽ 体育</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">写作风格</div>
+        <div class="tag-group" id="styleTags">
+          <div class="tag active" data-value="kuangchao">🔥 爽文</div>
+          <div class="tag" data-value="tianchong">🍬 甜宠</div>
+          <div class="tag" data-value="nveixin">💔 虐心</div>
+          <div class="tag" data-value="gaoxiao">😂 搞笑</div>
+          <div class="tag" data-value="xuanyi">🌫️ 悬疑</div>
+          <div class="tag" data-value="hei'an">🌑 暗黑</div>
+          <div class="tag" data-value="wenyi">🌸 文艺</div>
+          <div class="tag" data-value="rexue">💪 热血</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 章节配置</div>
+      <div class="form-group">
+        <div class="form-label">总章节数</div>
+        <div class="range-row">
+          <input type="range" id="chapterCount" min="50" max="80" value="65">
+          <div class="range-val" id="chapterCountVal">65</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">每章字数范围</div>
+        <div class="range-row">
+          <span style="font-size:11px;color:var(--text2)">2000</span>
+          <input type="range" id="wordsPerChapter" min="2000" max="3000" value="2500" step="100">
+          <span style="font-size:11px;color:var(--text2)">3000</span>
+          <div class="range-val" id="wordsPerChapterVal">2500</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">自定义世界观 (可选)</div>
+        <textarea class="form-textarea" id="worldSetting" placeholder="例如：末世丧尸背景，主角是退役特种兵，城市变成废墟..." rows="3"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎨 封面风格</div>
+      <div class="cover-styles" id="coverStyles"></div>
+    </div>
+
+    <div class="actions-bar">
+      <button class="btn btn-primary btn-block" onclick="generateBook()">🚀 一键生成整本书</button>
+      <button class="btn btn-outline btn-block" onclick="generateOutlineOnly()">📋 只生成大纲</button>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="word-count-summary">
+        <span>已完成: <strong id="doneCount">0</strong> 章</span>
+        <span>总字数: <strong id="doneWords">0</strong></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px;text-align:center" id="progressText">等待生成...</div>
+    </div>
+  </div>
+
+  <!-- 右侧主内容区 -->
+  <div class="main" id="mainContent">
+    <div class="empty-state">
+      <div class="icon">📖</div>
+      <p>轻小说 AI 工厂</p>
+      <small>选择类型和风格，一键生成完整小说</small>
+      <small style="margin-top:8px">50~80章 · 每章 2000~3000 字 · 含封面图</small>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== AI API 调用 ====================
+const AI_API_URL = 'https://ai-code-cn.adprod.cn/v1/chat/completions';
+
+function getApiKey() { return document.getElementById('apiKey')?.value?.trim(); }
+function getModel() { return document.getElementById('modelSelect')?.value?.trim(); }
+function isAIMode() { return document.getElementById('aiModeToggle')?.checked; }
+
+// 实时保存 API Key
+document.getElementById('apiKey')?.addEventListener('input', function() {
+  const key = this.value.trim();
+  if (key) localStorage.setItem('novel_gateway_key', key);
+  else localStorage.removeItem('novel_gateway_key');
+});
+
+// 实时保存模型名
+document.getElementById('modelSelect')?.addEventListener('input', function() {
+  const model = this.value.trim();
+  if (model) localStorage.setItem('novel_gateway_model', model);
+  else localStorage.removeItem('novel_gateway_model');
+});
+
+function toggleAIMode() {
+  const on = isAIMode();
+  const dot = document.getElementById('aiToggleDot');
+  const hint = document.getElementById('aiModeHint');
+  const label = dot?.previousElementSibling;
+  if (dot) { dot.style.left = on ? '23px' : '3px'; }
+  if (label) { label.style.background = on ? 'var(--green)' : 'var(--border)'; }
+  if (hint) { hint.textContent = on ? '当前：AI 模式（调用公司网关）' : '当前：模板模式（离线可用）'; }
+  const badge = document.getElementById('aiStatus');
+  if (badge) badge.style.display = on ? '' : 'none';
+  // Save key to localStorage
+  const key = getApiKey();
+  if (key) localStorage.setItem('novel_gateway_key', key);
+}
+
+async function callAI(prompt, maxTokens = 3000) {
+  const key = getApiKey();
+  if (!key) { showToast('⚠️ 请先填入 API Key'); throw new Error('No API Key'); }
+  const model = getModel();
+  if (!model) { showToast('⚠️ 请先填入模型名'); throw new Error('No Model'); }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2min timeout
+
+  try {
+    const resp = await fetch(AI_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.85,
+        top_p: 0.9
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      // 尝试解析错误信息
+      let errMsg = errText;
+      try { const errJson = JSON.parse(errText); errMsg = errJson.error?.message || errJson.message || errText; } catch(e) {}
+      throw new Error(`API 错误 (${resp.status}): ${errMsg}`);
+    }
+
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    return content.trim();
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error('请求超时（120秒）');
+    if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('CORS') || e.message.includes('Network request')) {
+      throw new Error('网络错误：浏览器可能被 CORS 策略拦截。建议使用代理或本地中转服务。');
+    }
+    throw e;
+  }
+}
+
+// ==================== API 连接测试 ====================
+async function testAPIConnection() {
+  const key = getApiKey();
+  if (!key) { showToast('⚠️ 请先填入 API Key'); return; }
+
+  showToast('🔌 正在测试连接...');
+  try {
+    const result = await callAI('回复"连接成功"四个字即可', 50);
+    if (result.includes('成功')) {
+      showToast('✅ API 连接正常！模型可用。');
+    } else {
+      showToast('✅ API 连接正常，返回: ' + result.substring(0, 30));
+    }
+  } catch (e) {
+    showToast('❌ 连接失败: ' + e.message);
+  }
+}
+
+// ==================== 数据模板 ====================
+const GENRE_DATA = {
+  male: {
+    xuanhuan: {
+      prefixes: ['九天','万古','太古','洪荒','不朽','逆天','神级','至尊','绝世','无敌','至尊','荒古','天命','混沌','永恒'],
+      cores: ['武魂','剑帝','神王','龙帝','战神','圣体','至尊','霸体','逆仙','天尊','神帝','剑仙','魔尊','妖皇','道祖'],
+      suffixes: ['诀','录','传','纪','典','经','志','赋','歌','诀','传','录','诀','说','赋'],
+      desc: '少年意外觉醒{desc_event}，从此踏上修炼巅峰之路。一路披荆斩棘，战胜各路天才强敌，最终{desc_goal}。'
+    },
+    dushi: {
+      prefixes: ['超能','无敌','重生','最强','都市','全能','极品','顶级','超级','逆天','非凡','绝品','无双','神级','至尊'],
+      cores: ['兵王','神医','仙尊','神豪','透视','狂少','龙少','狂兵','修仙','相师','高手','神人','豪少','医圣','高手'],
+      suffixes: ['在都市','归来','传说','系统','之路','时代','风云','崛起','之路','生活','人生','日记','生涯','时代','岁月'],
+      desc: '{desc_role}回归都市，{desc_ability}让他在都市中如鱼得水。商战、医术、武道，全能碾压，{desc_goal}。'
+    },
+    kehuan: {
+      prefixes: ['星际','未来','末世','机械','量子','银河','深渊','暗物质','虚拟','赛博','太空','虫洞','星际','末日','异星'],
+      cores: ['战舰','机甲','虫族','智脑','星门','基地','舰队','文明','帝国','要塞','星港','虫洞','星际','异形','入侵'],
+      suffixes: ['纪元','时代','文明','崛起','战争','之路','传说','战记','编年史','征程','纪事','年代','黎明','风暴','远征'],
+      desc: '在{desc_background}中，主角凭借{desc_advantage}，{desc_event}。面对未知的宇宙威胁，人类文明的命运悬于一线。'
+    },
+    youxi: {
+      prefixes: ['网游','虚拟','全能','重生','无敌','全息','传奇','全民','巅峰','巅峰','超级','终极','异界','神级','网游'],
+      cores: ['降临','归来','时代','世界','大师','高手','王者','传说','霸主','制霸','称霸','系统','传奇','时代','大陆'],
+      suffixes: ['Online','纪元','世界','之路','崛起','传说','王者','巅峰','之旅','生涯','时代','风云','崛起','之路','传奇'],
+      desc: '主角进入{desc_game}，获得{desc_advantage}，从零开始一步步成为游戏中的{desc_goal}。'
+    },
+    xuanyi: {
+      prefixes: ['暗夜','迷雾','深渊','诡秘','死亡','血色','诡异','暗影','致命','寂静','寒夜','迷踪','幽冥','密室','深渊'],
+      cores: ['档案','档案','谜案','禁区','线索','密室','真相','暗河','迷踪','档案','疑云','谜团','追凶','迷雾','迷局'],
+      suffixes: ['档案','之谜','追凶','调查','笔记','密室','疑云','档案','日记','手记','笔记','档案','档案','档案','记录'],
+      desc: '{desc_role}被卷入{desc_event}，一环扣一环的线索指向一个{desc_twist}。真相往往比想象更加可怕。'
+    },
+    lishi: {
+      prefixes: ['大明','大唐','大宋','三国','盛唐','末世','乱世','战火','帝国','王朝','天下','春秋','南北','大汉','乱世'],
+      cores: ['第一','枭雄','将军','谋士','亲王','战神','名将','帝王','权臣','世家','太子','丞相','元帅','皇帝','世家'],
+      suffixes: ['录','风云','争天下','之路','纪事','崛起','枭雄','传','天下','争霸','大业','风云','盛世','争霸','战纪'],
+      desc: '穿越到{desc_era}，成为{desc_role}。凭借{desc_advantage}，在乱世中{desc_goal}。'
+    },
+    xianxia: {
+      prefixes: ['仙路','修仙','万仙','青云','九霄','逍遥','飞升','问道','天道','仙界','剑道','长生','归仙','悟道','仙缘'],
+      cores: ['仙途','问道','长生','飞升','证道','化神','渡劫','悟道','仙缘','问道','仙途','飞升','仙路','修仙','证道'],
+      suffixes: ['录','传','诀','诀','纪','记','赋','经','传','录','赋','志','传','诀','录'],
+      desc: '凡人{desc_role}偶然踏入仙途，在{desc_world}中，{desc_event}。修炼百年，只为{desc_goal}。'
+    },
+    wuxia: {
+      prefixes: ['江湖','绝世','剑道','武道','天下','武林','豪侠','风云','刀剑','无双','武侠','侠客','刀客','剑客','一代'],
+      cores: ['第一刀','第一剑','宗师','大侠','侠客','剑圣','刀神','拳皇','无双','传说','绝世','巅峰','至尊','盖世','无双'],
+      suffixes: ['传','录','风云','传说','录','之路','纪','传记','传说','传奇','故事','风云','纪事','传说','风云'],
+      desc: '{desc_role}行走江湖，{desc_event}。在刀光剑影中，{desc_goal}。'
+    },
+    junshi: {
+      prefixes: ['铁血','战火','利刃','突击','王牌','冲锋','铁拳','闪电','狼牙','猛虎','雄鹰','特种','精锐','雷霆','风暴'],
+      cores: ['兵王','特工','佣兵','狙击','指挥','军官','老兵','战神','教官','尖刀','利刃','铁拳','雄师','铁血','雷霆'],
+      suffixes: ['归来','出击','行动','崛起','之路','档案','小队','传说','之战','出征','营救','使命','战线','战场','时代'],
+      desc: '{desc_role}接到{desc_mission}，{desc_event}。在枪林弹雨中，{desc_goal}。'
+    },
+    lingyi: {
+      prefixes: ['诡事','阴阳','午夜','鬼事','灵异','恐怖','凶宅','暗夜','诡异','阴间','冥界','灵堂','诡闻','异闻','午夜'],
+      cores: ['笔记','实录','档案','诡事','笔记','录','故事','见闻','手记','纪录','档案','录','记录','手记','闻录'],
+      suffixes: ['录','笔记','档案','实录','笔记','录','见闻','档案','手记','见闻','实录','记录','闻录','档案','记录'],
+      desc: '{desc_role}在一次{desc_event}后，发现自己拥有了{desc_advantage}，从此卷入了一个{desc_twist}的世界。'
+    },
+    tiyu: {
+      prefixes: ['绿茵','篮坛','球王','赛场','世界杯','冠军','体坛','巅峰','传奇','全能','超级','巨星','王牌','闪电','飞人'],
+      cores: ['之王','巨星','先生','传奇','之王','之王','时代','巅峰','传奇','时代','时代','传奇','巨星','传奇','巨星'],
+      suffixes: ['之路','崛起','时代','传奇','生涯','之路','巅峰','传奇','生涯','崛起','崛起','之路','生涯','传说','之路'],
+      desc: '{desc_role}重生回到{desc_time}，凭借{desc_advantage}，{desc_event}，最终{desc_goal}。'
+    }
+  },
+  female: {
+    xuanhuan: {
+      prefixes: ['凤逆','神女','帝女','仙妻','绝世','倾城','冥妻','神医','万兽','毒妃','妖后','凤归','天命','宠妃','废柴'],
+      cores: ['归来','逆天','空间','狂妃','医妃','天后','嫡女','嫡女','世子','王妃','圣女','大小姐','小姐','千金','妃子'],
+      suffixes: ['记','传','诀','录','记','记','传','诀','录','传','传','诀','传','录','诀'],
+      desc: '特工/杀手{desc_role}一朝穿越，成为{desc_identity}。面对各路刁难，{desc_event}，最终{desc_goal}。'
+    },
+    dushi: {
+      prefixes: ['重生','闪婚','宠妻','霸道','甜妻','总裁','豪宠','萌宝','王牌','天价','豪门','盛世','余生','极致','恰好'],
+      cores: ['娇妻','甜妻','妈咪','夫人','影后','千金','宝贝','前妻','新娘','夫人','千金','宠妻','夫人','娇妻','宠妻'],
+      suffixes: ['吧','当道','日记','日常','攻略','时代','来了','录','生活','时代','日记','纪事','岁月','实录','回忆'],
+      desc: '{desc_role}与{desc_male}之间，从{desc_event}开始，经历重重波折，{desc_goal}。'
+    },
+    yanqing: {
+      prefixes: ['深情','独宠','溺爱','痴恋','相许','许你','偏偏','偏偏','余生','朝朝','心尖','你是','致我们','偏偏','书名'],
+      cores: ['时光','情深','宠你','溺爱','甜心','宝贝','星辰','月光','偏爱','温柔','如初','不负','知意','入怀','情深'],
+      suffixes: ['如初','成说','之歌','无限','时光','似锦','是你','似海','为你','归你','是你','予你','如故','入骨','说爱你'],
+      desc: '{desc_role}和{desc_role2}在{desc_background}中相识相知，{desc_event}，{desc_goal}。'
+    },
+    kehuan: {
+      prefixes: ['星际','末世','星际','未来','银河','废土','量子','末日','赛博','深渊','太空','异星','暗物质','银河','星际'],
+      cores: ['宠妻','军嫂','女将','女帝','星将','女王','主母','夫人','指挥','统帅','女皇','将军','元帅','夫人','主帅'],
+      suffixes: ['纪元','时代','宠妻','日常','记录','之战','日记','生活','之路','生涯','时代','日记','时代','时代','之路'],
+      desc: '在{desc_background}中，{desc_role}凭借{desc_advantage}，{desc_event}，{desc_goal}。'
+    },
+    youxi: {
+      prefixes: ['网游','虚拟','全息','重生','全民','萌新','超级','全能','顶级','巅峰','传奇','无敌','星际','神级','全息'],
+      cores: ['菜鸟','奶妈','大神','萌新','小白','大佬','玩家','达人','高手','王者','传说','高手','菜鸟','萌新','玩家'],
+      suffixes: ['日常','传','之路','时代','日记','传说','生涯','之旅','日记','崛起','生活','之路','日记','时代','时代'],
+      desc: '{desc_role}进入{desc_game}，意外{desc_event}。和大神{desc_male}之间的故事，{desc_goal}。'
+    },
+    xuanyi: {
+      prefixes: ['迷雾','暗夜','诡事','密室','迷踪','谜案','深渊','暗影','血色','诡异','迷局','诡闻','幽冥','深夜','诡异'],
+      cores: ['迷踪','档案','笔记','疑云','谜团','密室','追凶','线索','真相','暗河','手记','笔记','档案','档案','调查'],
+      suffixes: ['录','笔记','之谜','档案','记录','调查','之谜','笔记','记录','档案','笔记','实录','手记','之谜','调查'],
+      desc: '{desc_role}为了{desc_motive}深入调查{desc_event}，发现真相远比想象的{desc_twist}。'
+    },
+    lishi: {
+      prefixes: ['嫡女','王妃','凤归','宫闱','帝王','皇后','宠妃','宫廷','盛世','宫斗','锦绣','凤鸣','皇朝','后宫','嫡女'],
+      cores: ['攻略','之路','日常','生涯','之路','传','之路','崛起','风华','记','录','传','记','记','崛起'],
+      suffixes: ['记','传','录','诀','记','录','传','录','录','传','录','传','记','录','录'],
+      desc: '{desc_role}穿越到{desc_era}成为{desc_identity}，凭借{desc_advantage}，{desc_event}，最终{desc_goal}。'
+    },
+    xianxia: {
+      prefixes: ['仙路','修仙','万仙','青云','九霄','逍遥','飞升','问道','天道','仙界','剑道','长生','归仙','悟道','仙缘'],
+      cores: ['仙妻','神女','仙女','道侣','师姐','师妹','仙姑','道子','仙子','仙妃','仙缘','仙侣','道侣','灵女','天女'],
+      suffixes: ['录','传','诀','记','纪','诀','传','录','传','诀','诀','传','录','诀','传'],
+      desc: '{desc_role}误入仙途，在{desc_world}中遇到{desc_male}，{desc_event}，{desc_goal}。'
+    },
+    wuxia: {
+      prefixes: ['江湖','侠女','剑仙','武林','天下','绝世','无双','一代','豪侠','风云','武侠','侠女','女侠','剑客','无双'],
+      cores: ['侠女','女侠','剑客','侠女','侠女','女侠','女侠','女侠','侠女','女侠','侠女','侠女','侠女','女侠','侠女'],
+      suffixes: ['传','录','风云','传说','录','之路','纪','录','传','传说','传奇','传','录','风云','传'],
+      desc: '{desc_role}行走江湖，{desc_event}，与{desc_male}之间{desc_goal}。'
+    },
+    junshi: {
+      prefixes: ['铁血','军营','战场','硝烟','战火','利刃','军装','战士','前线','冲锋','铁血','王牌','军婚','战地','利刃'],
+      cores: ['军嫂','军花','军医','女兵','女军','夫人','军嫂','女兵','女医','军嫂','军嫂','女兵','军嫂','女医','军嫂'],
+      suffixes: ['时代','日常','日记','生活','时代','生活','日常','时代','生涯','日记','生活','时代','日记','时代','生活'],
+      desc: '{desc_role}来到{desc_background}，遇到{desc_male}，{desc_event}，{desc_goal}。'
+    },
+    lingyi: {
+      prefixes: ['诡异','鬼事','灵异','凶宅','午夜','阴阳','恐怖','暗夜','诡异','阴间','冥界','灵堂','诡闻','异闻','午夜'],
+      cores: ['笔记','实录','档案','诡事','笔记','录','故事','见闻','手记','纪录','档案','录','记录','手记','闻录'],
+      suffixes: ['录','笔记','档案','实录','笔记','录','见闻','档案','手记','见闻','实录','记录','闻录','档案','记录'],
+      desc: '{desc_role}在{desc_event}后发现自己能看到{desc_advantage}，{desc_twist}让她卷入了一场{desc_goal}。'
+    },
+    tiyu: {
+      prefixes: ['花滑','体操','花样','冰上','网坛','赛场','冠军','巅峰','传奇','金牌','花样','全能','网球','跳水','滑雪'],
+      cores: ['女王','公主','天后','冠军','天后','女神','新星','女王','冠军','女神','天后','冠军','女王','天后','冠军'],
+      suffixes: ['之路','崛起','时代','传奇','生涯','之路','巅峰','传说','之路','时代','崛起','生涯','之路','巅峰','之路'],
+      desc: '{desc_role}重生回到{desc_time}，凭借{desc_advantage}，{desc_event}，{desc_goal}。'
+    }
+  }
+};
+
+// 合并到 both
+GENRE_DATA.both = JSON.parse(JSON.stringify(GENRE_DATA.male));
+
+const AUTHOR_SURNAMES = ['墨','萧','夜','顾','沈','冷','凤','慕','凌','叶','陆','楚','苏','林','南','百里','上官','欧阳','轩辕','司空','慕容','诸葛','皇甫','端木','公孙','独孤','令狐','东方'];
+const AUTHOR_NAMES = ['云深','落尘','如烟','清歌','月白','知秋','念安','未央','长安','长安','长歌','白衣','子衿','若水','清欢','听风','观雪','抚琴','执笔','弄墨','踏雪','寻梅','望月','临风','照影','归尘','入梦','浮生','半夏','南风'];
+
+const COVER_PALETTE = {
+  xuanhuan: { bg1:'#1a0533', bg2:'#0d1b2a', accent:'#ffd700', accent2:'#ff6b6b', glow:'rgba(255,215,0,.3)' },
+  dushi: { bg1:'#0a1628', bg2:'#1a2744', accent:'#4ecdc4', accent2:'#ff6b6b', glow:'rgba(78,205,196,.3)' },
+  yanqing: { bg1:'#2d1b3d', bg2:'#1a0a2e', accent:'#ff6b9d', accent2:'#c084fc', glow:'rgba(255,107,157,.3)' },
+  kehuan: { bg1:'#050a15', bg2:'#0a1628', accent:'#00d4ff', accent2:'#7c3aed', glow:'rgba(0,212,255,.3)' },
+  youxi: { bg1:'#0a0a1a', bg2:'#1a1a3a', accent:'#22d3ee', accent2:'#a855f7', glow:'rgba(34,211,238,.3)' },
+  xuanyi: { bg1:'#0d0d0d', bg2:'#1a1a2e', accent:'#94a3b8', accent2:'#ef4444', glow:'rgba(148,163,184,.3)' },
+  lishi: { bg1:'#1a0f0a', bg2:'#2d1810', accent:'#d4a574', accent2:'#8b5e3c', glow:'rgba(212,165,116,.3)' },
+  xianxia: { bg1:'#0a1628', bg2:'#0d2847', accent:'#60a5fa', accent2:'#c084fc', glow:'rgba(96,165,250,.3)' },
+  wuxia: { bg1:'#1a0f0a', bg2:'#2d1a10', accent:'#f59e0b', accent2:'#ef4444', glow:'rgba(245,158,11,.3)' },
+  junshi: { bg1:'#0a1a0a', bg2:'#0d2810', accent:'#22c55e', accent2:'#f59e0b', glow:'rgba(34,197,94,.3)' },
+  lingyi: { bg1:'#0d0d1a', bg2:'#1a0a2e', accent:'#8b5cf6', accent2:'#06b6d4', glow:'rgba(139,92,246,.3)' },
+  tiyu: { bg1:'#0a1a2e', bg2:'#0d2847', accent:'#22d3ee', accent2:'#f59e0b', glow:'rgba(34,211,238,.3)' }
+};
+
+// ==================== 状态 ====================
+let state = {
+  gender: 'male', genre: 'xuanhuan', style: 'kuangchao',
+  chapterCount: 65, wordsPerChapter: 2500,
+  book: null, chapters: [], activeChapter: -1,
+  coverStyle: 0, isGenerating: false
+};
+
+// ==================== 初始化 ====================
+document.addEventListener('DOMContentLoaded', () => {
+  initTagGroups();
+  initRangeInputs();
+  renderCoverStyles();
+  updateStats();
+  // Restore saved gateway config
+  const savedKey = localStorage.getItem('novel_gateway_key');
+  if (savedKey) document.getElementById('apiKey').value = savedKey;
+  const savedModel = localStorage.getItem('novel_gateway_model');
+  if (savedModel) document.getElementById('modelSelect').value = savedModel;
+});
+
+function initTagGroups() {
+  [['genderTags','gender'],['genreTags','genre'],['styleTags','style']].forEach(([id, key]) => {
+    document.querySelectorAll(`#${id} .tag`).forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll(`#${id} .tag`).forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        state[key] = t.dataset.value;
+        renderCoverStyles();
+      };
+    });
+  });
+}
+
+function initRangeInputs() {
+  const cc = document.getElementById('chapterCount');
+  const wpc = document.getElementById('wordsPerChapter');
+  cc.oninput = () => { state.chapterCount = +cc.value; document.getElementById('chapterCountVal').textContent = cc.value; };
+  wpc.oninput = () => { state.wordsPerChapter = +wpc.value; document.getElementById('wordsPerChapterVal').textContent = wpc.value; };
+}
+
+// ==================== 封面风格预览 ====================
+function renderCoverStyles() {
+  const container = document.getElementById('coverStyles');
+  container.innerHTML = '';
+  const palettes = Object.keys(COVER_PALETTE);
+  palettes.forEach((genre, i) => {
+    const div = document.createElement('div');
+    div.className = 'cover-style-option' + (i === 0 ? ' active' : '');
+    div.onclick = () => {
+      document.querySelectorAll('.cover-style-option').forEach(x => x.classList.remove('active'));
+      div.classList.add('active');
+      state.coverStyle = i;
+    };
+    const canvas = document.createElement('canvas');
+    canvas.width = 120; canvas.height = 180;
+    div.appendChild(canvas);
+    const label = document.createElement('div');
+    label.className = 'cover-style-label';
+    label.textContent = document.querySelector(`#genreTags .tag[data-value="${genre}"]`)?.textContent?.trim() || genre;
+    div.appendChild(label);
+    container.appendChild(div);
+    drawMiniCover(canvas, palettes[i]);
+  });
+}
+
+function drawMiniCover(canvas, genre) {
+  const ctx = canvas.getContext('2d');
+  const p = COVER_PALETTE[genre] || COVER_PALETTE.xuanhuan;
+  const g = ctx.createLinearGradient(0,0,canvas.width,canvas.height);
+  g.addColorStop(0, p.bg1); g.addColorStop(1, p.bg2);
+  ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Decorative circles
+  ctx.beginPath(); ctx.arc(canvas.width*.7, canvas.height*.3, 40, 0, Math.PI*2);
+  ctx.fillStyle = p.glow; ctx.fill();
+  ctx.beginPath(); ctx.arc(canvas.width*.3, canvas.height*.7, 25, 0, Math.PI*2);
+  ctx.fillStyle = p.glow; ctx.fill();
+  // Title bar
+  ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(0,canvas.height*.55,canvas.width,2);
+  // Title
+  ctx.fillStyle = p.accent; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('示例书名', canvas.width/2, canvas.height*.45);
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '9px sans-serif';
+  ctx.fillText('作者名', canvas.width/2, canvas.height*.52);
+  // Border
+  ctx.strokeStyle = p.accent + '40'; ctx.lineWidth = 1; ctx.strokeRect(6,6,canvas.width-12,canvas.height-12);
+}
+
+// ==================== 工具函数 ====================
+function pick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+function randInt(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ==================== 生成书名/作者/简介 ====================
+async function generateBookMeta() {
+  const genderMap = {male:'男频',female:'女频',both:'通用'};
+  const genreMap = {xuanhuan:'玄幻',dushi:'都市',yanqing:'言情',kehuan:'科幻',youxi:'游戏',xuanyi:'悬疑',lishi:'历史',xianxia:'仙侠',wuxia:'武侠',junshi:'军事',lingyi:'灵异',tiyu:'体育'};
+  const styleMap = {kuangchao:'爽文',tianchong:'甜宠',nueixin:'虐心',gaoxiao:'搞笑',xuanyi:'悬疑','hei\'an':'暗黑',wenyi:'文艺',rexue:'热血'};
+  const worldSetting = document.getElementById('worldSetting')?.value?.trim();
+  
+  if (isAIMode()) {
+    try {
+      const prompt = `你是一位资深网络小说作家。请为一本轻小说生成以下信息，用JSON格式输出（不要markdown代码块）：
+{
+  "title": "书名（3-7个字，吸引眼球）",
+  "author": "作者笔名（两个字的古风/文艺笔名）",
+  "desc": "简介（80-150字，要吸引读者继续阅读，突出主角金手指和核心冲突）"
+}
+
+要求：
+- 频道方向：${genderMap[state.gender]}
+- 小说类型：${genreMap[state.genre]||state.genre}
+- 写作风格：${styleMap[state.style]||state.style}
+${worldSetting ? '- 自定义世界观：'+worldSetting : ''}
+- 书名要有辨识度，不要跟已有大热小说重名
+- 简介要突出爽点，制造悬念`;
+
+      const result = await callAI(prompt, 800);
+      // Try to parse JSON from the response
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          title: parsed.title || '未命名小说',
+          author: parsed.author || '佚名',
+          desc: parsed.desc || '',
+          tags: [genderMap[state.gender], genreMap[state.genre]||state.genre, styleMap[state.style]||state.style],
+          totalChapters: state.chapterCount,
+          wordsPerChapter: state.wordsPerChapter,
+          genre: state.genre
+        };
+      }
+    } catch (e) {
+      showToast('⚠️ AI生成书名失败，已切换模板模式: ' + e.message);
+    }
+  }
+  
+  // Template mode fallback
+  const gd = GENRE_DATA[state.gender]?.[state.genre] || GENRE_DATA.male[state.genre] || GENRE_DATA.male.xuanhuan;
+  const title = pick(gd.prefixes) + pick(gd.cores) + pick(gd.suffixes);
+  const author = pick(AUTHOR_SURNAMES) + pick(AUTHOR_NAMES);
+  const desc = generateDesc(gd.desc, state.gender, state.genre);
+  
+  return {
+    title, author, desc,
+    tags: [genderMap[state.gender], genreMap[state.genre]||state.genre, styleMap[state.style]||state.style],
+    totalChapters: state.chapterCount,
+    wordsPerChapter: state.wordsPerChapter,
+    genre: state.genre
+  };
+}
+
+function generateDesc(template, gender, genre) {
+  return template
+    .replace('{desc_event}', '意外获得了超越常人的力量和机遇')
+    .replace('{desc_goal}', '走上了人生巅峰，成就不朽传说')
+    .replace('{desc_role}', '主角')
+    .replace('{desc_ability}', '过人的天赋和独特的能力')
+    .replace('{desc_background}', '一个充满未知和挑战的世界')
+    .replace('{desc_advantage}', '前世记忆和独特的天赋')
+    .replace('{desc_identity}', '一个被人轻视的存在')
+    .replace('{desc_twist}', '令人难以置信的')
+    .replace('{desc_male}', '一位神秘而强大的男性角色')
+    .replace('{desc_role2}', '另一位重要角色')
+    .replace('{desc_motive}', '一个重要的原因')
+    .replace('{desc_mission}', '一项绝密任务')
+    .replace('{desc_time}', '命运转折的那一天')
+    .replace('{desc_game}', '一个全新的虚拟世界')
+    .replace('{desc_era}', '一个波澜壮阔的时代');
+}
+
+// ==================== 生成章节大纲 ====================
+async function generateChapterOutlines(book) {
+  const genderMap = {male:'男频',female:'女频',both:'通用'};
+  const genreMap = {xuanhuan:'玄幻',dushi:'都市',yanqing:'言情',kehuan:'科幻',youxi:'游戏',xuanyi:'悬疑',lishi:'历史',xianxia:'仙侠',wuxia:'武侠',junshi:'军事',lingyi:'灵异',tiyu:'体育'};
+  const styleMap = {kuangchao:'爽文',tianchong:'甜宠',nueixin:'虐心',gaoxiao:'搞笑',xuanyi:'悬疑','hei\'an':'暗黑',wenyi:'文艺',rexue:'热血'};
+  
+  if (isAIMode()) {
+    try {
+      const prompt = `你是一位资深网络小说策划。为以下小说生成全部${book.totalChapters}章的章节大纲。
+用JSON数组格式输出（不要markdown代码块），每个元素格式：
+{"num": 章节号, "title": "章节标题", "arc": "所属卷名"}
+
+小说信息：
+- 书名：${book.title}
+- 类型：${genreMap[state.genre]||state.genre}，${genderMap[state.gender]}
+- 风格：${styleMap[state.style]||state.style}
+- 简介：${book.desc}
+
+要求：
+1. 分为7个卷：初入江湖、崭露头角、风云初起、纵横驰骋、巅峰对决、逆境重生、终章加冕
+2. 每卷的章节数按比例分配（约12%/13%/15%/15%/15%/12%/18%）
+3. 章节标题要吸引人，带有悬念或爽点
+4. 第1章为"序章"，最后1章为"终章"
+5. 每章标题格式：第X章 标题内容
+6. 输出完整的${book.totalChapters}章`;
+
+      const result = await callAI(prompt, 4000);
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const outlines = JSON.parse(jsonMatch[0]);
+        return outlines.map(ch => ({
+          num: ch.num || 1,
+          arc: ch.arc || '未分卷',
+          title: ch.title || `第${ch.num}章`,
+          content: null
+        }));
+      }
+    } catch (e) {
+      showToast('⚠️ AI生成大纲失败，已切换模板模式: ' + e.message);
+    }
+  }
+  
+  // Template mode fallback
+  const outlines = [];
+  const total = book.totalChapters;
+  
+  // Arc structure
+  const arcs = [
+    { name: '初入江湖', start: 0, end: Math.floor(total * 0.12), prefix: ['初识','偶遇','意外','初到','开篇','迷茫','觉醒','踏入','初遇','命运'] },
+    { name: '崭露头角', start: Math.floor(total * 0.12), end: Math.floor(total * 0.25), prefix: ['崭露','小试','初战','突破','锋芒','历练','成长','蜕变','崛起','乘风'] },
+    { name: '风云初起', start: Math.floor(total * 0.25), end: Math.floor(total * 0.4), prefix: ['风云','暗流','激荡','交锋','危局','逆转','险境','破局','绝地','反击'] },
+    { name: '纵横驰骋', start: Math.floor(total * 0.4), end: Math.floor(total * 0.55), prefix: ['纵横','驰骋','争霸','碾压','横扫','威震','无敌','称霸','制霸','狂飙'] },
+    { name: '巅峰对决', start: Math.floor(total * 0.55), end: Math.floor(total * 0.7), prefix: ['巅峰','决战','终极','宿敌','生死','雷霆','风云','天崩','破灭','决战'] },
+    { name: '逆境重生', start: Math.floor(total * 0.7), end: Math.floor(total * 0.82), prefix: ['逆境','重生','涅槃','觉醒','归来','逆转','反杀','绝境','重生','破茧'] },
+    { name: '终章·加冕', start: Math.floor(total * 0.82), end: total, prefix: ['终极','封神','称霸','至尊','登顶','加冕','不朽','传说','永恒','圆满'] }
+  ];
+  
+  const chapterVerbs = ['意外','突然','竟然','竟然','终于','终于','竟然','突然','意外','最终','终于','竟然','突然','意外','终于'];
+  const chapterNouns = {
+    xuanhuan: ['突破','境界','功法','神器','灵药','秘境','天劫','兽潮','遗迹','宝库','传承','圣地','古墓','禁地','秘闻'],
+    dushi: ['合同','项目','公司','美女','对手','商机','集团','财富','身份','势力','兄弟','对手','危机','转机','逆袭'],
+    yanqing: ['心动','误会','告白','重逢','分离','等待','真相','守护','陪伴','承诺','思念','心动','纠结','决定','幸福'],
+    kehuan: ['虫洞','能量','文明','战舰','异形','科技','基因','维度','信号','殖民','危机','进化','空间','时间','意识'],
+    youxi: ['副本','装备','技能','BOSS','公会','排行','任务','隐藏','全服','赛季','更新','竞技','团战','世界','巅峰'],
+    xuanyi: ['线索','证据','嫌疑人','现场','监控','证人','真相','密室','密码','逃亡','陷阱','对峙','推理','真相','落幕'],
+    lishi: ['朝廷','战场','谋略','盟友','兵法','攻城','变法','奸臣','民心','粮草','奇袭','围城','天下','皇权','盛世'],
+    xianxia: ['渡劫','飞升','道法','灵宝','仙府','天劫','仙丹','法宝','雷劫','仙界','道心','化神','元婴','大乘','真仙'],
+    wuxia: ['剑法','内功','门派','江湖','论剑','恩仇','秘籍','暗器','经脉','掌法','兵器','高手','绝招','武道','天下'],
+    junshi: ['突击','伏击','侦察','撤退','增援','包围','突围','狙击','情报','渗透','营救','轰炸','冲锋','会战','胜利'],
+    lingyi: ['鬼影','凶宅','亡灵','阴阳','通灵','怨气','咒怨','冥界','灵异','附身','驱鬼','阴阳','怨灵','镇魂','还魂'],
+    tiyu: ['训练','比赛','突破','伤病','冠军','对手','赛季','决赛','记录','转会','战术','绝杀','加冕','传奇','退役']
+  };
+  
+  const nouns = chapterNouns[state.genre] || chapterNouns.xuanhuan;
+  
+  for (let i = 0; i < total; i++) {
+    const arc = arcs.find(a => i >= a.start && i < a.end) || arcs[arcs.length - 1];
+    const chapterNum = i + 1;
+    
+    if (chapterNum <= 3 || chapterNum >= total - 2) {
+      // Opening and ending chapters get special titles
+      if (chapterNum === 1) {
+        outlines.push({ num: chapterNum, arc: arc.name, title: '序章·命运的开端', content: null });
+      } else if (chapterNum === 2) {
+        outlines.push({ num: chapterNum, arc: arc.name, title: `第${chapterNum}章 ${pick(['觉醒','踏上','命运','改变'])}之路`, content: null });
+      } else if (chapterNum === 3) {
+        outlines.push({ num: chapterNum, arc: arc.name, title: `第${chapterNum}章 初${pick(['试锋芒','窥门径','露锋芒','入江湖','见天地'])}`, content: null });
+      } else if (chapterNum >= total - 1) {
+        outlines.push({ num: chapterNum, arc: arc.name, title: `终章·${pick(['不朽传说','巅峰之巅','永恒荣耀','天下无敌','终极加冕'])}`, content: null });
+      } else {
+        outlines.push({ num: chapterNum, arc: arc.name, title: `第${chapterNum}章 ${pick(['尾声','最后','终局'])}${pick(nouns)}`, content: null });
+      }
+    } else {
+      // Regular chapters: arc prefix + random noun + optional modifier
+      const prefix = pick(arc.prefix);
+      const noun = pick(nouns);
+      const modifiers = ['!','，危机','，逆袭','！','，真相','，破局','，转机','！','，突破',''];
+      outlines.push({ num: chapterNum, arc: arc.name, title: `第${chapterNum}章 ${prefix}${noun}${pick(modifiers)}`, content: null });
+    }
+  }
+  
+  return outlines;
+}
+
+// ==================== 生成章节内容 ====================
+async function generateChapterContent(chapter, book, allChapters) {
+  if (isAIMode()) {
+    try {
+      const genreMap = {xuanhuan:'玄幻',dushi:'都市',yanqing:'言情',kehuan:'科幻',youxi:'游戏',xuanyi:'悬疑',lishi:'历史',xianxia:'仙侠',wuxia:'武侠',junshi:'军事',lingyi:'灵异',tiyu:'体育'};
+      const styleMap = {kuangchao:'爽文',tianchong:'甜宠',nueixin:'虐心',gaoxiao:'搞笑',xuanyi:'悬疑','hei\'an':'暗黑',wenyi:'文艺',rexue:'热血'};
+      
+      // Build context from nearby chapters
+      const prevChapter = allChapters.find(c => c.num === chapter.num - 1);
+      const prevContext = prevChapter?.content ? prevChapter.content.substring(0, 500) : '';
+      
+      const prompt = `你是一位专业的网络小说写手，正在连载一本${genreMap[state.genre]||''}类型的${styleMap[state.style]||''}风格小说。
+
+【小说信息】
+书名：${book.title}
+简介：${book.desc}
+
+【上下文】
+当前是第${chapter.num}章「${chapter.title}」，属于${chapter.arc}卷。
+${prevContext ? '上一章结尾：\n' + prevContext + '\n' : ''}
+${chapter.num === 1 ? '这是第一章，需要介绍主角、世界观和初始冲突。\n' : ''}
+
+【写作要求】
+1. 字数要求：${state.wordsPerChapter}字左右，不能少于${state.wordsPerChapter - 300}字
+2. 保持爽点密集，每段都要有钩子让读者想继续看
+3. 结尾要留悬念（断章）
+4. 对话要生动，要有画面感
+5. 纯正文内容，不要任何标题或分割线
+6. 直接开始写正文，不要"本章摘要"之类的开头
+
+请直接输出正文内容。`;
+
+      const content = await callAI(prompt, Math.ceil(state.wordsPerChapter * 1.5));
+      return { content, wordCount: content.length };
+    } catch (e) {
+      showToast('⚠️ AI生成失败，已切换模板: ' + e.message);
+      // Fall through to template mode
+    }
+  }
+  
+  // Template mode fallback
+  const wc = state.wordsPerChapter + randInt(-200, 200);
+  const content = generateNovelText(chapter, book, allChapters, wc);
+  return { content, wordCount: content.length };
+}
+
+function generateNovelText(chapter, book, allChapters, targetWords) {
+  const gender = state.gender;
+  const genre = state.genre;
+  const style = state.style;
+  const isFemale = gender === 'female';
+  const isRomance = genre === 'yanqing' || style === 'tianchong';
+  const isFunny = style === 'gaoxiao';
+  const isDark = style === 'hei\'an';
+  const isHotBlood = style === 'rexue' || style === 'kuangchao';
+  
+  // Character names
+  const maleNames = isFemale 
+    ? ['顾景琛','陆衍舟','沈墨寒','夜凌渊','萧战霆','冷弈辰','慕容逸','凤辞渊','司空爵','百里珩']
+    : ['林逸','叶凡','萧炎','陈默','陆渊','苏辰','凌霄、楚风','夜辰','萧尘','秦天'];
+  const femaleNames = isFemale 
+    ? ['苏晚宁','沈清辞','顾念之','叶灵溪','沐清歌','柳如烟','白浅浅','凤九歌','楚瑶','慕清欢']
+    : ['柳如烟','苏颜','沐清雪','林诗音','叶倾城','慕容雪','白灵儿','凤灵儿','南宫婉','楚月'];
+  
+  const mcName = isFemale ? pick(femaleNames) : pick(maleNames);
+  const mlName = isFemale ? pick(maleNames) : (isRomance ? pick(femaleNames) : pick(maleNames));
+  const sidekick = isFemale ? pick(femaleNames.filter(n => n !== mcName)) : pick(maleNames.filter(n => n !== mcName));
+  
+  // Build paragraphs
+  let paragraphs = [];
+  
+  // Opening lines
+  const openings = {
+    kuangchao: [
+      `${mcName}站在最高处，俯瞰下方所有对手。`,
+      `一声巨响，${mcName}的气势陡然爆发，在场所有人都感到一阵窒息。`,
+      `"你以为这就完了？"${mcName}嘴角微微上扬，眼中闪烁着危险的光芒。`,
+      `${mcName}缓缓站起身，周身灵力涌动，周围的空气都在颤抖。`,
+      `所有人都在嘲笑${mcName}，但他们不知道，真正的强者从不在乎别人的目光。`
+    ],
+    tianchong: [
+      `${mlName}低沉的声音在耳畔响起："过来。"`,
+      `${mcName}的心跳突然加速，因为${mlName}正看着她（他），目光温柔得不像话。`,
+      `"别动。"${mlName}伸手，轻轻擦去了${mcName}脸上的泪痕。`,
+      `${mcName}从未想过，有一天自己会这样依赖一个人。`,
+      `清晨的阳光洒落，${mcName}睁开眼，${mlName}正守在床边。`
+    ],
+    nueixin: [
+      `${mcName}的眼泪无声地落下，心像被撕裂一般疼痛。`,
+      `"你从来都没有爱过我，对吧？"${mcName}的声音在颤抖。`,
+      `${mcName}转过身，不想让任何人看到自己崩溃的模样。`,
+      `窗外的雨淅淅沥沥地下着，就像${mcName}此刻的心情。`,
+      `${mcName}告诉自己要坚强，但眼泪却止不住。`
+    ],
+    gaoxiao: [
+      `${mcName}看着眼前的状况，嘴角抽搐了一下——这到底什么鬼？`,
+      `"等等，让我消化一下。"${mcName}举起手，"你说你是什么？！"`,
+      `${mcName}此刻只想说一句话：我太难了。`,
+      `事情的发展完全超出了${mcName}的预料，简直离谱他妈给离谱开门——离谱到家了。`,
+      `${mcName}深吸一口气，决定用最朴素的方式解决这个问题——跑。`
+    ],
+    xuanyi: [
+      `夜色浓重，${mcName}站在窗前，总觉得有什么东西在注视着自己。`,
+      `空气中弥漫着诡异的气息，${mcName}不由自主地打了个寒颤。`,
+      `那扇门明明是从里面锁着的，但此刻——它正在缓缓地打开。`,
+      `${mcName}低头看了看手中的照片，瞳孔猛然一缩。`,
+      `时钟指向午夜十二点，一切安静得不正常。`
+    ],
+    wenyi: [
+      `夕阳将天空染成了橘红色，${mcName}独自站在桥头，看着流水远去。`,
+      `风轻轻吹过，带走了${mcName}的发丝，也带走了那些说不出口的情绪。`,
+      `${mcName}翻开旧日记，那些文字像是穿越了时空的 whispers。`,
+      `那年的樱花飘落在肩头，${mcName}至今还记得那天的味道。`,
+      `月光如水，洒在${mcName}安静的脸上，像是一首未完成的诗。`
+    ],
+    rexue: [
+      `"我不会认输的！"${mcName}咬紧牙关，从地上爬了起来。`,
+      `鲜血顺着${mcName}的脸颊滑落，但眼中燃烧的斗志比任何时候都要炽烈。`,
+      `${mcName}的拳头上布满了伤痕，但每一道伤痕都是荣耀的勋章。`,
+      `"只要还有一口气在，我就不会倒下！"${mcName}的怒吼响彻全场。`,
+      `所有人沉默了。${mcName}居然还站着——不，不仅站着，气势比之前更强了。`
+    ],
+    'hei\'an': [
+      `黑暗中，${mcName}的眼神冰冷得没有任何温度。`,
+      `"规则？在我这里，我就是规则。"${mcName}的声音像是从地狱深处传来。`,
+      `${mcName}看着倒在地上的对手，脸上没有任何表情。这不是战斗，这是碾压。`,
+      `这个世界从来都是弱肉强食。${mcName}比任何人都清楚这个道理。`,
+      `没有人知道${mcName}经历了什么，也没有人敢问。因为问过的人——都不在了。`
+    ]
+  };
+  
+  const chapterOpenings = openings[style] || openings.kuangchao;
+  paragraphs.push(pick(chapterOpenings));
+  paragraphs.push('');
+  
+  // Generate middle paragraphs
+  const templates = getTemplates(genre, style, isFemale, isRomance);
+  const numMiddle = Math.floor(targetWords / 80);
+  
+  for (let i = 0; i < numMiddle; i++) {
+    if (i % 4 === 0 && i > 0) paragraphs.push('');
+    paragraphs.push(generateParagraph(templates, mcName, mlName, sidekick, chapter, genre));
+  }
+  
+  // Cliffhanger ending
+  const endings = getEndings(genre, style, mcName, mlName);
+  paragraphs.push('');
+  paragraphs.push(pick(endings));
+  
+  let text = paragraphs.join('\n');
+  // Pad to target length
+  while (text.length < targetWords - 500) {
+    text += '\n\n' + generateParagraph(templates, mcName, mlName, sidekick, chapter, genre);
+  }
+  
+  return text.substring(0, Math.max(targetWords, 1500));
+}
+
+function getTemplates(genre, style, isFemale, isRomance) {
+  const templates = [];
+  
+  // Action templates
+  templates.push(
+    `${'{mc}'}的眉头微微皱起，这个情况比想象中更加复杂。`,
+    `空气中弥漫着一股压迫感，${'{mc}'}能清晰地感觉到——有人在暗中观察。`,
+    `"有意思。"${'{mc}'}嘴角勾起一抹弧度，"看来今天不会太平了。"`,
+    `${'{mc}'}深吸一口气，将体内的力量运转到了极致。这一刻，他（她）已经做好了万全准备。`,
+    `周围的人都屏住了呼吸，等待着接下来会发生什么。`,
+    `时间仿佛凝固了，空气中只剩下紧张的心跳声。`,
+    `${'{mc}'}的目光变得锐利起来，像一把出鞘的利剑。`
+  );
+  
+  if (isRomance) {
+    templates.push(
+      `${'{ml}'}不知何时出现在了${'{mc}'}身后，低沉的声音响起："怎么一个人待在这里？"`,
+      `${'{mc}'}的心跳不由自主地加速了，脸上泛起了一层薄红。`,
+      `${'{ml}'}伸出手，轻轻握住了${'{mc}'}微凉的指尖。`,
+      `"笨蛋。"${'{ml}'}低声说道，但语气中分明带着宠溺。`,
+      `${'{mc}'}看着${'{ml}'}的侧脸，心里涌起一种从未有过的安宁。`
+    );
+  }
+  
+  if (style === 'gaoxiao') {
+    templates.push(
+      `场面一度十分尴尬。${'{mc}'}咳了一声，假装什么都没发生。`,
+      `"我说你是不是脑子进水了？"${'{sidekick}'}毫不留情地说道。`,
+      `${'{mc}'}内心OS：我到底做错了什么，要摊上这么个队友？`,
+      `然而事情的发展告诉${'{mc}'}——还能更离谱。`,
+      `${'{mc}'}看了看天，看了看地，最后决定——还是先跑为上策。`
+    );
+  }
+  
+  if (style === 'kuangchao') {
+    templates.push(
+      `"就这点实力？"${'{mc}'}嗤笑一声，"让我来教教你什么叫做真正的力量。"`,
+      `砰！巨大的冲击波向四面八方扩散，在场的人都被震得连连后退。`,
+      `${'{mc}'}身上的气势越来越强，简直像一尊战神降临！`,
+      `"不可能！"${'对方面色大变'}，"这怎么可能！"`,
+      `${'{mc}'}一出手就是雷霆万钧，根本没有给对手任何喘息的机会。`
+    );
+  }
+  
+  // Genre-specific
+  if (genre === 'xuanhuan' || genre === 'xianxia') {
+    templates.push(
+      `一道道灵纹在${'{mc}'}身上浮现，散发着耀眼的宝光。`,
+      `天地灵气疯狂涌入${'{mc}'}的体内，丹田中的真元旋涡越转越快。`,
+      `"这是……${'突破的前兆！'}"${'围观的人惊呼出声'}。`,
+      `${'{mc}'}催动功法，一道巨大的虚影出现在身后——那是一尊威严无比的神像！`,
+      `灵力碰撞产生的气浪掀翻了周围的一切，${'{mc}'}的长发在灵力风暴中猎猎飞舞。`
+    );
+  }
+  
+  if (genre === 'dushi') {
+    templates.push(
+      `${'{mc}'}拿出手机，看了一眼屏幕上显示的消息，嘴角微微上扬。`,
+      `"几百万而已，小事。"${'{mc}'}轻描淡写地说道。`,
+      `对方的脸色变得极其难看，他怎么也没想到${'{mc}'}居然有这样的背景。`,
+      `${'{mc}'}端起茶杯轻轻抿了一口，姿态从容不迫。`,
+      `"在这个城市里，"${'{mc}'}放下茶杯，"还没有我摆不平的事。"`
+    );
+  }
+  
+  if (genre === 'kehuan') {
+    templates.push(
+      `全息屏幕上闪烁着密密麻麻的数据流，${'{mc}'}快速分析着其中的关键信息。`,
+      `引擎发出低沉的轰鸣，巨大的战舰缓缓启动，星际之门在眼前打开。`,
+      `${'{mc}'}调出战术面板，开始制定下一步的行动方案。`,
+      `"能量护盾还能维持多久？"${'{mc}'}沉声问道。`,
+      `警报声响彻整个舰桥——敌军主力正在靠近！`
+    );
+  }
+  
+  return templates;
+}
+
+function generateParagraph(templates, mc, ml, sidekick, chapter, genre) {
+  return pick(templates)
+    .replace(/\{mc\}/g, mc)
+    .replace(/\{ml\}/g, ml)
+    .replace(/\{sidekick\}/g, sidekick);
+}
+
+function getEndings(genre, style, mc, ml) {
+  const endings = [
+    `${mc}的眼神变得坚定起来，他知道真正的挑战才刚刚开始。`,
+    `一切看似尘埃落定，但${mc}隐约感觉到，暗处还有更大的风暴在酝酿。`,
+    `${mc}嘴角微微上扬，"好戏，还在后头。"`,
+    `这一战虽然结束了，但${mc}知道，前方的路还很长很长。`,
+    `月光洒下，${mc}站在高处，望着远方的天际——新的征程即将开始。`
+  ];
+  
+  if (style === 'kuangchao') endings.push(`"谁敢拦我？"${mc}的声音震慑全场，无一人敢应。`);
+  if (style === 'nueixin') endings.push(`${mc}默默转过身，眼泪在转身的瞬间落下。有些人，终究是留不住的。`);
+  if (style === 'gaoxiao') endings.push(`${mc}叹了口气："我觉得我这辈子最大的错误，就是——"算了，这个故事下次再说。`);
+  if (style === 'xuanyi') endings.push(`真相的冰山一角已经显露，但${mc}知道，更大的秘密还隐藏在黑暗之中……`);
+  
+  return endings;
+}
+
+// ==================== 封面绘制 ====================
+function drawCover(canvas, book) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = 600;
+  const H = canvas.height = 840;
+  
+  const p = COVER_PALETTE[book.genre] || COVER_PALETTE.xuanhuan;
+  
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, W * 0.3, H);
+  bg.addColorStop(0, p.bg1);
+  bg.addColorStop(1, p.bg2);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  
+  // Decorative glow circles
+  const drawGlow = (x, y, r, alpha) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, p.glow);
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.fillRect(x-r, y-r, r*2, r*2);
+  };
+  
+  drawGlow(W*0.75, H*0.25, 180, 0.4);
+  drawGlow(W*0.2, H*0.65, 120, 0.3);
+  drawGlow(W*0.5, H*0.1, 80, 0.2);
+  
+  // Grid lines for sci-fi feel
+  if (book.genre === 'kehuan' || book.genre === 'youxi') {
+    ctx.strokeStyle = p.accent + '10';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < W; i += 40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,H); ctx.stroke(); }
+    for (let i = 0; i < H; i += 40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(W,i); ctx.stroke(); }
+    // Glow nodes
+    for (let i = 0; i < 15; i++) {
+      const x = Math.random()*W, y = Math.random()*H;
+      ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2);
+      ctx.fillStyle = p.accent + '60'; ctx.fill();
+      drawGlow(x,y,15,0.2);
+    }
+  }
+  
+  // Mountain silhouette for xuanhuan/xianxia/wuxia/lishi
+  if (['xuanhuan','xianxia','wuxia','lishi','junshi'].includes(book.genre)) {
+    ctx.beginPath();
+    ctx.moveTo(0, H*0.75);
+    for (let x = 0; x <= W; x += 2) {
+      const y = H*0.75 - Math.sin(x*0.008)*60 - Math.sin(x*0.015)*40 - Math.sin(x*0.003)*30;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+    const mg = ctx.createLinearGradient(0, H*0.5, 0, H);
+    mg.addColorStop(0, p.accent + '15');
+    mg.addColorStop(1, 'transparent');
+    ctx.fillStyle = mg; ctx.fill();
+  }
+  
+  // Horizontal divider
+  ctx.fillStyle = p.accent + '30';
+  ctx.fillRect(W*0.1, H*0.42, W*0.8, 1);
+  
+  // Title
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 56px "Microsoft YaHei", "PingFang SC", sans-serif';
+  ctx.shadowColor = p.accent;
+  ctx.shadowBlur = 20;
+  
+  // Split long titles into 2 lines
+  const title = book.title;
+  if (title.length > 6) {
+    ctx.fillText(title.substring(0, Math.ceil(title.length/2)), W/2, H*0.36);
+    ctx.fillText(title.substring(Math.ceil(title.length/2)), W/2, H*0.36 + 65);
+  } else {
+    ctx.fillText(title, W/2, H*0.38);
+  }
+  ctx.shadowBlur = 0;
+  
+  // Subtitle / tag line
+  ctx.fillStyle = p.accent;
+  ctx.font = '18px "Microsoft YaHei", sans-serif';
+  const tagline = book.tags.join(' · ');
+  ctx.fillText(tagline, W/2, H*0.44 + 20);
+  
+  // Author
+  ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.font = '20px "Microsoft YaHei", sans-serif';
+  ctx.fillText(`作者: ${book.author}`, W/2, H*0.50);
+  
+  // Description snippet
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.font = '14px "Microsoft YaHei", sans-serif';
+  const descSnippet = book.desc.substring(0, 60) + (book.desc.length > 60 ? '...' : '');
+  ctx.fillText(descSnippet, W/2, H*0.55);
+  
+  // Chapter count badge
+  ctx.fillStyle = p.accent + '20';
+  const badgeW = 120, badgeH = 32;
+  const badgeX = W/2 - badgeW/2, badgeY = H*0.58;
+  ctx.beginPath();
+  ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 16);
+  ctx.fill();
+  ctx.fillStyle = p.accent;
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText(`${book.totalChapters}章 · ${book.wordsPerChapter}字/章`, W/2, badgeY + 21);
+  
+  // Decorative border
+  ctx.strokeStyle = p.accent + '40';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(16, 16, W-32, H-32);
+  
+  // Corner decorations
+  const drawCorner = (x, y, dx, dy) => {
+    ctx.strokeStyle = p.accent + '80';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+dx, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y+dy); ctx.stroke();
+  };
+  drawCorner(24, 24, 30, 30);
+  drawCorner(W-24, 24, -30, 30);
+  drawCorner(24, H-24, 30, -30);
+  drawCorner(W-24, H-24, -30, -30);
+  
+  // Bottom decorative line
+  ctx.fillStyle = p.accent + '20';
+  ctx.fillRect(W*0.2, H*0.92, W*0.6, 1);
+  ctx.fillStyle = 'rgba(255,255,255,.3)';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('AI 生成 · 仅供演示', W/2, H*0.95);
+}
+
+// ==================== 主生成逻辑 ====================
+async function generateBook() {
+  if (state.isGenerating) return;
+  state.isGenerating = true;
+  
+  // Step 1: Generate metadata
+  updateMain('正在生成书籍信息...');
+  await delay(300);
+  state.book = await generateBookMeta();
+  
+  // Step 2: Generate chapter outlines
+  updateMain(isAIMode() ? '🤖 AI 正在规划章节大纲（需要几秒）...' : '正在规划章节大纲...');
+  await delay(300);
+  state.chapters = await generateChapterOutlines(state.book);
+  state.activeChapter = -1;
+  
+  // Step 3: Render UI
+  renderMainUI();
+  drawMainCover();
+  
+  // Step 4: Generate chapters one by one
+  const useAI = isAIMode();
+  for (let i = 0; i < state.chapters.length; i++) {
+    if (!state.isGenerating) break;
+    state.chapters[i].status = 'generating';
+    updateChapterItem(i);
+    updateProgress();
+    
+    if (!useAI) await delay(randInt(100, 300));
+    const result = await generateChapterContent(state.chapters[i], state.book, state.chapters);
+    state.chapters[i].content = result.content;
+    state.chapters[i].wordCount = result.wordCount;
+    state.chapters[i].status = 'done';
+    updateChapterItem(i);
+    updateStats();
+    updateProgress();
+  }
+  
+  state.isGenerating = false;
+  showToast(`✅ 生成完成！共 ${state.chapters.filter(c=>c.status==='done').length} 章`);
+}
+
+async function generateOutlineOnly() {
+  if (state.isGenerating) return;
+  state.isGenerating = true;
+  updateMain(isAIMode() ? '🤖 AI 正在生成书名和大纲...' : '正在生成...');
+  state.book = await generateBookMeta();
+  state.chapters = await generateChapterOutlines(state.book);
+  state.activeChapter = -1;
+  state.isGenerating = false;
+  renderMainUI();
+  drawMainCover();
+  updateStats();
+  updateProgress();
+  showToast(`📋 大纲已生成，共 ${state.chapters.length} 章`);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ==================== 渲染 ====================
+function renderMainUI() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `
+    <div class="book-preview">
+      <div class="cover-preview"><canvas id="mainCoverCanvas"></canvas></div>
+      <div class="book-info">
+        <div class="book-title-display">${state.book.title}</div>
+        <div class="book-meta">
+          <span>✍️ ${state.book.author}</span>
+          <span>📚 ${state.book.tags.join(' · ')}</span>
+          <span>📖 ${state.book.totalChapters} 章</span>
+          <span>📝 ${state.book.wordsPerChapter}字/章</span>
+        </div>
+        <div class="book-desc">${state.book.desc}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary" onclick="downloadCoverPNG()">📥 下载封面 PNG</button>
+          <button class="btn btn-sm btn-success" onclick="batchGenerateContent()">🚀 批量生成全部内容</button>
+          <button class="btn btn-sm btn-outline" onclick="exportAllTXT()">📄 导出全部 TXT</button>
+          <button class="btn btn-sm btn-outline" onclick="exportJSON()">📋 导出 JSON</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(this,'list')">📖 章节列表</div>
+      <div class="tab" onclick="switchTab(this,'content')">📝 内容预览</div>
+      <div class="tab" onclick="switchTab(this,'stats')">📊 统计信息</div>
+    </div>
+    
+    <div id="tabList">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <button class="btn btn-sm btn-primary" onclick="generateSelectedChapters()">✅ 生成选中章节</button>
+        <button class="btn btn-sm btn-outline" onclick="selectAllChapters()">全选</button>
+        <button class="btn btn-sm btn-outline" onclick="deselectAllChapters()">取消全选</button>
+        <button class="btn btn-sm btn-outline" onclick="stopGeneration()">⏹️ 停止</button>
+        <span style="margin-left:auto;font-size:12px;color:var(--text2)" id="listInfo"></span>
+      </div>
+      <div class="chapter-list" id="chapterListContainer"></div>
+    </div>
+    
+    <div id="tabContent" style="display:none">
+      <div class="chapter-content-area">
+        <div id="chapterContentDisplay">
+          <div class="chapter-body empty">← 请先在章节列表中选择一章查看内容</div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="tabStats" style="display:none"></div>
+  `;
+  
+  renderChapterList();
+}
+
+function renderChapterList() {
+  const container = document.getElementById('chapterListContainer');
+  if (!container) return;
+  
+  let html = '';
+  let currentArc = '';
+  state.chapters.forEach((ch, i) => {
+    if (ch.arc !== currentArc) {
+      currentArc = ch.arc;
+      html += `<div style="font-size:12px;color:var(--accent2);padding:8px 0 4px;font-weight:600">━ ${currentArc} ━</div>`;
+    }
+    html += `
+      <div class="chapter-item" id="chItem${i}" onclick="selectChapter(${i})">
+        <input type="checkbox" class="ch-checkbox" data-index="${i}" onclick="event.stopPropagation()">
+        <div class="chapter-num ${ch.status==='done'?'done':ch.status==='generating'?'generating':''}">${ch.num}</div>
+        <div class="chapter-title">${ch.title}</div>
+        <div class="chapter-status ${ch.status||'pending'}">${ch.status==='done'?'已完成':ch.status==='generating'?'生成中...':'待生成'}</div>
+        <div class="chapter-wordcount">${ch.wordCount ? ch.wordCount+'字' : '-'}</div>
+      </div>`;
+  });
+  container.innerHTML = html;
+  updateListInfo();
+}
+
+function updateChapterItem(i) {
+  const el = document.getElementById(`chItem${i}`);
+  if (!el) return;
+  const ch = state.chapters[i];
+  el.querySelector('.chapter-num').className = `chapter-num ${ch.status==='done'?'done':ch.status==='generating'?'generating':''}`;
+  el.querySelector('.chapter-status').className = `chapter-status ${ch.status||'pending'}`;
+  el.querySelector('.chapter-status').textContent = ch.status==='done'?'已完成':ch.status==='generating'?'生成中...':'待生成';
+  el.querySelector('.chapter-wordcount').textContent = ch.wordCount ? ch.wordCount+'字' : '-';
+  updateListInfo();
+}
+
+function updateListInfo() {
+  const done = state.chapters.filter(c=>c.status==='done').length;
+  const el = document.getElementById('listInfo');
+  if (el) el.textContent = `${done} / ${state.chapters.length} 章已完成`;
+}
+
+function drawMainCover() {
+  const canvas = document.getElementById('mainCoverCanvas');
+  if (canvas && state.book) drawCover(canvas, state.book);
+}
+
+// ==================== 章节交互 ====================
+function selectChapter(i) {
+  state.activeChapter = i;
+  document.querySelectorAll('.chapter-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`chItem${i}`)?.classList.add('active');
+  switchTab(document.querySelectorAll('.tab')[1], 'content');
+  renderChapterContent(i);
+}
+
+function renderChapterContent(i) {
+  const ch = state.chapters[i];
+  const display = document.getElementById('chapterContentDisplay');
+  if (!display) return;
+  
+  if (ch.status === 'done' && ch.content) {
+    display.innerHTML = `
+      <div class="chapter-toolbar">
+        <button class="btn btn-sm btn-primary" onclick="downloadChapterTXT(${i})">📥 下载本章</button>
+        <button class="btn btn-sm btn-outline" onclick="regenerateChapter(${i})">🔄 重新生成</button>
+        <span style="font-size:12px;color:var(--text2);margin-left:auto">${ch.title} · ${ch.wordCount} 字</span>
+      </div>
+      <div class="chapter-body">${escapeHtml(ch.content)}</div>
+    `;
+  } else if (ch.status === 'generating') {
+    display.innerHTML = `<div class="chapter-body empty">⏳ 正在生成中...</div>`;
+  } else {
+    display.innerHTML = `
+      <div class="chapter-toolbar">
+        <button class="btn btn-sm btn-primary" onclick="generateSingleChapter(${i})">🚀 生成本章</button>
+        <span style="font-size:12px;color:var(--text2);margin-left:auto">${ch.title}</span>
+      </div>
+      <div class="chapter-body empty">点击上方按钮生成内容</div>
+    `;
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ==================== 章节生成 ====================
+async function generateSingleChapter(i) {
+  const ch = state.chapters[i];
+  ch.status = 'generating';
+  updateChapterItem(i);
+  renderChapterContent(i);
+  
+  if (!isAIMode()) await delay(randInt(200, 500));
+  const result = await generateChapterContent(ch, state.book, state.chapters);
+  ch.content = result.content;
+  ch.wordCount = result.wordCount;
+  ch.status = 'done';
+  updateChapterItem(i);
+  renderChapterContent(i);
+  updateStats();
+  updateProgress();
+  showToast(`✅ ${ch.title} 生成完成 (${ch.wordCount}字)`);
+}
+
+async function generateSelectedChapters() {
+  const checkboxes = document.querySelectorAll('.ch-checkbox:checked');
+  if (checkboxes.length === 0) { showToast('请先勾选要生成的章节'); return; }
+  
+  state.isGenerating = true;
+  for (const cb of checkboxes) {
+    if (!state.isGenerating) break;
+    const i = +cb.dataset.index;
+    if (state.chapters[i].status === 'done') continue;
+    await generateSingleChapter(i);
+  }
+  state.isGenerating = false;
+}
+
+async function batchGenerateContent() {
+  state.isGenerating = true;
+  const useAI = isAIMode();
+  for (let i = 0; i < state.chapters.length; i++) {
+    if (!state.isGenerating) break;
+    if (state.chapters[i].status === 'done') continue;
+    state.chapters[i].status = 'generating';
+    updateChapterItem(i);
+    updateProgress();
+    if (!useAI) await delay(randInt(80, 200));
+    const result = await generateChapterContent(state.chapters[i], state.book, state.chapters);
+    state.chapters[i].content = result.content;
+    state.chapters[i].wordCount = result.wordCount;
+    state.chapters[i].status = 'done';
+    updateChapterItem(i);
+    updateStats();
+    updateProgress();
+  }
+  state.isGenerating = false;
+  showToast(`✅ 全部 ${state.chapters.filter(c=>c.status==='done').length} 章生成完成！`);
+}
+
+function regenerateChapter(i) {
+  state.chapters[i].status = null;
+  state.chapters[i].content = null;
+  state.chapters[i].wordCount = 0;
+  updateChapterItem(i);
+  generateSingleChapter(i);
+}
+
+function stopGeneration() { state.isGenerating = false; showToast('⏹️ 已停止生成'); }
+
+function selectAllChapters() {
+  document.querySelectorAll('.ch-checkbox').forEach(cb => cb.checked = true);
+}
+function deselectAllChapters() {
+  document.querySelectorAll('.ch-checkbox').forEach(cb => cb.checked = false);
+}
+
+// ==================== Tab 切换 ====================
+function switchTab(el, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tabList').style.display = tab==='list'?'':'none';
+  document.getElementById('tabContent').style.display = tab==='content'?'':'none';
+  document.getElementById('tabStats').style.display = tab==='stats'?'':'none';
+  if (tab === 'stats') renderStats();
+}
+
+function renderStats() {
+  const el = document.getElementById('tabStats');
+  const done = state.chapters.filter(c=>c.status==='done');
+  const totalWords = done.reduce((s,c)=>s+c.wordCount,0);
+  const avgWords = done.length ? Math.round(totalWords/done.length) : 0;
+  
+  // Arc stats
+  const arcStats = {};
+  state.chapters.forEach(ch => {
+    if (!arcStats[ch.arc]) arcStats[ch.arc] = {total:0,done:0,words:0};
+    arcStats[ch.arc].total++;
+    if (ch.status==='done') { arcStats[ch.arc].done++; arcStats[ch.arc].words += ch.wordCount; }
+  });
+  
+  let arcHtml = '';
+  Object.entries(arcStats).forEach(([name, s]) => {
+    const pct = s.total ? Math.round(s.done/s.total*100) : 0;
+    arcHtml += `
+      <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;min-width:100px">${name}</span>
+        <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span style="font-size:12px;color:var(--text2)">${s.done}/${s.total}</span>
+        <span style="font-size:12px;color:var(--text2)">${(s.words/10000).toFixed(1)}万字</span>
+      </div>`;
+  });
+  
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">📊 总体统计</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--accent2)">${done.length}</div>
+          <div style="font-size:12px;color:var(--text2)">已完成章节</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--green)">${(totalWords/10000).toFixed(1)}万</div>
+          <div style="font-size:12px;color:var(--text2)">总字数</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--gold)">${avgWords}</div>
+          <div style="font-size:12px;color:var(--text2)">平均字数/章</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--pink)">${Math.round(done.length*2.5)}</div>
+          <div style="font-size:12px;color:var(--text2)">预估省时(小时)</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📈 分卷进度</div>
+      ${arcHtml}
+    </div>`;
+}
+
+// ==================== 更新统计 ====================
+function updateStats() {
+  const done = state.chapters.filter(c=>c.status==='done');
+  const totalWords = done.reduce((s,c)=>s+c.wordCount,0);
+  document.getElementById('totalChapters').textContent = `📖 ${done.length} 章`;
+  document.getElementById('totalWords').textContent = `📝 ${(totalWords/10000).toFixed(1)}万字`;
+  document.getElementById('totalTime').textContent = `⏱️ 省约 ${Math.round(done.length*2.5)} 小时`;
+  document.getElementById('doneCount').textContent = done.length;
+  document.getElementById('doneWords').textContent = totalWords.toLocaleString();
+}
+
+function updateProgress() {
+  const total = state.chapters.length;
+  const done = state.chapters.filter(c=>c.status==='done').length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressText').textContent = total ? `${done}/${total} (${pct}%)` : '等待生成...';
+}
+
+function updateMain(msg) {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="empty-state">
+      <div class="icon" style="animation:pulse 1s infinite">⏳</div>
+      <p>${msg}</p>
+    </div>`;
+}
+
+// ==================== 导出 ====================
+function downloadCoverPNG() {
+  const canvas = document.getElementById('mainCoverCanvas');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = `${state.book.title}_封面.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('📥 封面已下载');
+}
+
+function downloadChapterTXT(i) {
+  const ch = state.chapters[i];
+  if (!ch || !ch.content) return;
+  const blob = new Blob([`${ch.title}\n\n${ch.content}`], {type:'text/plain;charset=utf-8'});
+  const link = document.createElement('a');
+  link.download = `第${String(ch.num).padStart(3,'0')}章_${ch.title.replace(/第\d+章\s*/,'')}.txt`;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  showToast('📥 章节已下载');
+}
+
+function exportAllTXT() {
+  const done = state.chapters.filter(c=>c.status==='done');
+  if (done.length === 0) { showToast('没有已完成的章节'); return; }
+  let content = `${state.book.title}\n作者: ${state.book.author}\n${state.book.desc}\n\n${'='.repeat(50)}\n\n`;
+  done.forEach(ch => { content += `${ch.title}\n\n${ch.content}\n\n${'─'.repeat(30)}\n\n`; });
+  const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+  const link = document.createElement('a');
+  link.download = `${state.book.title}_全本.txt`;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  showToast(`📥 已导出 ${done.length} 章，共 ${(done.reduce((s,c)=>s+c.wordCount,0)/10000).toFixed(1)} 万字`);
+}
+
+function exportJSON() {
+  const data = {
+    book: state.book,
+    chapters: state.chapters.map(c => ({
+      num: c.num, arc: c.arc, title: c.title,
+      wordCount: c.wordCount || 0,
+      content: c.content || ''
+    }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json;charset=utf-8'});
+  const link = document.createElement('a');
+  link.download = `${state.book.title}_数据.json`;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  showToast('📋 JSON 已导出');
+}
+</script>
+</body>
+</html>
