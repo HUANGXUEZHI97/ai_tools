@@ -158,8 +158,8 @@ body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; ba
     <div class="card" id="aiSettingsCard">
       <div class="card-title">🤖 AI 接入设置</div>
       <div class="form-group">
-        <div class="form-label">公司网关 API Key</div>
-        <input type="password" class="form-input" id="apiKey" placeholder="请输入公司网关 API Key" autocomplete="off">
+        <div class="form-label">公司网关令牌（可选）</div>
+        <input type="password" class="form-input" id="apiKey" placeholder="需要鉴权时填写 Bearer Token" autocomplete="off">
         <div style="font-size:10px;color:var(--text2);margin-top:4px">
           请求网关：https://ai-code-cn.adprod.cn
         </div>
@@ -323,7 +323,6 @@ function toggleAIMode() {
 
 async function callAI(prompt, maxTokens = 3000) {
   const key = getApiKey();
-  if (!key) { showToast('⚠️ 请先填入 API Key'); throw new Error('No API Key'); }
   const model = getModel();
   if (!model) { showToast('⚠️ 请先填入模型名'); throw new Error('No Model'); }
 
@@ -333,7 +332,10 @@ async function callAI(prompt, maxTokens = 3000) {
   try {
     const resp = await fetch(AI_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'Authorization': `Bearer ${key}` } : {})
+      },
       body: JSON.stringify({
         model: model,
         messages: [{ role: 'user', content: prompt }],
@@ -368,8 +370,8 @@ async function callAI(prompt, maxTokens = 3000) {
 
 // ==================== API 连接测试 ====================
 async function testAPIConnection() {
-  const key = getApiKey();
-  if (!key) { showToast('⚠️ 请先填入 API Key'); return; }
+  const model = getModel();
+  if (!model) { showToast('⚠️ 请先填入模型名'); return; }
 
   showToast('🔌 正在测试连接...');
   try {
